@@ -14,6 +14,28 @@ import { Plus, Trash2 } from "lucide-react";
 import { useInvoiceStore, invoiceSelectors } from "../store/invoiceStore";
 import { formatMoney, toDataUrl } from "../utils/invoice";
 
+const BRIGHT_COLORS = [
+  "#EF4444",
+  "#F97316",
+  "#EAB308",
+  "#22C55E",
+  "#06B6D4",
+  "#3B82F6",
+  "#7C3AED",
+  "#EC4899",
+];
+
+const PASTEL_COLORS = [
+  "#FCA5A5",
+  "#FDBA74",
+  "#FDE68A",
+  "#86EFAC",
+  "#67E8F9",
+  "#93C5FD",
+  "#C4B5FD",
+  "#F9A8D4",
+];
+
 export default function EditorPanel() {
   const {
     invoice,
@@ -32,6 +54,9 @@ export default function EditorPanel() {
   const subtotal = useMemo(() => invoiceSelectors.subtotal(invoice), [invoice]);
   const total = useMemo(() => invoiceSelectors.total(invoice), [invoice]);
   const [logoError, setLogoError] = useState<string>("");
+  const [colorMode, setColorMode] = useState<"bright" | "pastel" | "custom">(
+    "custom",
+  );
 
   const handleLogoUpload = async (file?: File, input?: HTMLInputElement | null) => {
     if (!file) return;
@@ -329,15 +354,61 @@ export default function EditorPanel() {
             <Card>
               <Flex direction="column" gap="3">
                 <Text weight="medium">Appearance</Text>
-                <label>
-                  <Text size="2">Accent Color</Text>
-                  <input
-                    className="mt-1 h-10 w-full cursor-pointer rounded border border-gray-300 bg-white dark:border-zinc-700 dark:bg-zinc-900"
-                    type="color"
-                    value={invoice.settings.accentColor}
-                    onChange={(e) => updateSettings({ accentColor: e.target.value })}
-                  />
-                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <Button
+                    type="button"
+                    variant={colorMode === "bright" ? "solid" : "soft"}
+                    onClick={() => setColorMode("bright")}
+                  >
+                    Bright
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={colorMode === "pastel" ? "solid" : "soft"}
+                    onClick={() => setColorMode("pastel")}
+                  >
+                    Pastel
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={colorMode === "custom" ? "solid" : "soft"}
+                    onClick={() => setColorMode("custom")}
+                  >
+                    Custom
+                  </Button>
+                </div>
+
+                {colorMode !== "custom" ? (
+                  <div className="grid grid-cols-4 gap-2">
+                    {(colorMode === "bright" ? BRIGHT_COLORS : PASTEL_COLORS).map((color) => {
+                      const isActive = invoice.settings.accentColor.toLowerCase() === color.toLowerCase();
+                      return (
+                        <button
+                          key={color}
+                          type="button"
+                          aria-label={`Use accent color ${color}`}
+                          className={`h-10 w-full rounded-md border transition ${
+                            isActive
+                              ? "scale-[1.02] border-gray-900 ring-2 ring-purple-500 dark:border-white"
+                              : "border-gray-200 hover:border-gray-400 dark:border-zinc-700 dark:hover:border-zinc-400"
+                          }`}
+                          style={{ backgroundColor: color }}
+                          onClick={() => updateSettings({ accentColor: color })}
+                        />
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <label>
+                    <Text size="2">Accent Color</Text>
+                    <input
+                      className="mt-1 h-10 w-full cursor-pointer rounded border border-gray-300 bg-white dark:border-zinc-700 dark:bg-zinc-900"
+                      type="color"
+                      value={invoice.settings.accentColor}
+                      onChange={(e) => updateSettings({ accentColor: e.target.value })}
+                    />
+                  </label>
+                )}
               </Flex>
             </Card>
             <Card>
