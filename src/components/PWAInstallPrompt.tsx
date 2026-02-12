@@ -23,7 +23,7 @@ export default function PWAInstallPrompt() {
 
   return (
     <div className="no-print fixed bottom-4 right-4">
-      <Card>
+      <Card className="border border-purple-100 bg-white/95 dark:border-zinc-800 dark:bg-zinc-900/95">
         <Flex gap="3" align="center">
           <Text size="2">Install SpeedyBill for offline use</Text>
           <Button

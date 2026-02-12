@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Button,
   Card,
@@ -31,16 +31,34 @@ export default function EditorPanel() {
 
   const subtotal = useMemo(() => invoiceSelectors.subtotal(invoice), [invoice]);
   const total = useMemo(() => invoiceSelectors.total(invoice), [invoice]);
+  const [logoError, setLogoError] = useState<string>("");
 
-  const handleLogoUpload = async (file?: File) => {
+  const handleLogoUpload = async (file?: File, input?: HTMLInputElement | null) => {
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) return;
-    const logo = await toDataUrl(file);
-    updateBusiness({ logo });
+    if (!file.type.startsWith("image/")) {
+      setLogoError("Please upload a valid image file.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setLogoError("Logo is too large. Please use an image up to 5MB.");
+      return;
+    }
+
+    try {
+      const logo = await toDataUrl(file);
+      updateBusiness({ logo });
+      setLogoError("");
+    } catch {
+      const fallbackUrl = URL.createObjectURL(file);
+      updateBusiness({ logo: fallbackUrl });
+      setLogoError("");
+    } finally {
+      if (input) input.value = "";
+    }
   };
 
   return (
-    <aside className="no-print h-[calc(100vh-68px)] overflow-y-auto border-r border-purple-100 bg-white/80 p-5">
+    <aside className="no-print h-full min-h-0 overflow-y-auto p-5">
       <Flex direction="column" gap="4">
         <Card>
           <Text size="2" weight="medium">
@@ -97,7 +115,7 @@ export default function EditorPanel() {
                 <label>
                   <Text size="2">Issue Date</Text>
                   <input
-                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
                     type="date"
                     value={invoice.meta.issueDate}
                     onChange={(e) => updateMeta({ issueDate: e.target.value })}
@@ -106,7 +124,7 @@ export default function EditorPanel() {
                 <label>
                   <Text size="2">Due Date</Text>
                   <input
-                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
                     type="date"
                     value={invoice.meta.dueDate}
                     onChange={(e) => updateMeta({ dueDate: e.target.value })}
@@ -119,17 +137,31 @@ export default function EditorPanel() {
               <Flex direction="column" gap="3">
                 <Text weight="medium">Business Details</Text>
                 <label>
-                  <Text size="2">Logo (PNG/JPG up to 2MB)</Text>
+                  <Text size="2">Logo (PNG/JPG/WebP up to 5MB)</Text>
                   <input
-                    className="mt-1 block w-full text-sm"
+                    className="mt-1 block w-full text-sm file:rounded-md file:border-0 file:bg-purple-600 file:px-3 file:py-2 file:text-white file:transition-colors hover:file:bg-purple-500"
                     type="file"
-                    accept="image/png,image/jpeg"
+                    accept="image/png,image/jpeg,image/webp"
                     onChange={(e) => {
                       const [file] = Array.from(e.target.files ?? []);
-                      void handleLogoUpload(file);
+                      void handleLogoUpload(file, e.currentTarget);
                     }}
                   />
                 </label>
+                {logoError ? (
+                  <Text size="1" color="red">
+                    {logoError}
+                  </Text>
+                ) : null}
+                {invoice.business.logo ? (
+                  <div className="rounded-md border border-gray-200 p-2 dark:border-zinc-700">
+                    <img
+                      src={invoice.business.logo}
+                      alt="Uploaded business logo"
+                      className="h-12 w-auto object-contain"
+                    />
+                  </div>
+                ) : null}
                 <TextField.Root
                   placeholder="Business Name"
                   value={invoice.business.name}
@@ -213,8 +245,13 @@ export default function EditorPanel() {
           <Tabs.Content value="items" className="mt-4 space-y-4">
             <Card>
               <Flex direction="column" gap="3">
+                <div className="sticky top-0 z-[1] -mx-1 rounded-md bg-white/95 px-1 py-1 backdrop-blur dark:bg-zinc-900/95">
+                  <Button onClick={addItem}>
+                    <Plus size={14} /> Add Item
+                  </Button>
+                </div>
                 {invoice.items.map((item) => (
-                  <div key={item.id} className="rounded-md border border-gray-200 p-3">
+                  <div key={item.id} className="rounded-md border border-gray-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900">
                     <Flex direction="column" gap="2">
                       <TextField.Root
                         placeholder="Description"
@@ -257,9 +294,6 @@ export default function EditorPanel() {
                     </Flex>
                   </div>
                 ))}
-                <Button onClick={addItem}>
-                  <Plus size={14} /> Add Item
-                </Button>
               </Flex>
             </Card>
 
@@ -298,7 +332,7 @@ export default function EditorPanel() {
                 <label>
                   <Text size="2">Accent Color</Text>
                   <input
-                    className="mt-1 h-10 w-full cursor-pointer rounded border border-gray-300"
+                    className="mt-1 h-10 w-full cursor-pointer rounded border border-gray-300 bg-white dark:border-zinc-700 dark:bg-zinc-900"
                     type="color"
                     value={invoice.settings.accentColor}
                     onChange={(e) => updateSettings({ accentColor: e.target.value })}

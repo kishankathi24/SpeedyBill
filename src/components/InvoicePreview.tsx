@@ -5,6 +5,7 @@ import { formatDate, formatMoney } from "../utils/invoice";
 
 interface InvoicePreviewProps {
   invoice: InvoiceData;
+  scale?: number;
 }
 
 const templateClassMap = {
@@ -13,14 +14,18 @@ const templateClassMap = {
   minimal: "border-l-4",
 };
 
-const InvoicePreview = forwardRef<HTMLDivElement, InvoicePreviewProps>(({ invoice }, ref) => {
+const InvoicePreview = forwardRef<HTMLDivElement, InvoicePreviewProps>(
+  ({ invoice, scale = 1 }, ref) => {
   const subtotal = invoiceSelectors.subtotal(invoice);
   const taxAmount = invoiceSelectors.taxAmount(invoice);
   const discountAmount = invoiceSelectors.discountAmount(invoice);
   const total = invoiceSelectors.total(invoice);
 
   return (
-    <div className="print-surface mx-auto w-full max-w-[860px] p-6">
+    <div
+      className="print-surface mx-auto w-fit transition-transform duration-300 ease-out"
+      style={{ transform: `scale(${scale})`, transformOrigin: "top center" }}
+    >
       <article
         ref={ref}
         className={`invoice-document mx-auto flex flex-col p-10 shadow-paper ${templateClassMap[invoice.settings.template]}`}
@@ -147,7 +152,8 @@ const InvoicePreview = forwardRef<HTMLDivElement, InvoicePreviewProps>(({ invoic
       </article>
     </div>
   );
-});
+  },
+);
 
 InvoicePreview.displayName = "InvoicePreview";
 
