@@ -3,6 +3,7 @@ import { useReactToPrint } from "react-to-print";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { Theme } from "@radix-ui/themes";
+import { X } from "lucide-react";
 import TopBar from "./components/TopBar";
 import EditorPanel from "./components/EditorPanel";
 import InvoicePreview from "./components/InvoicePreview";
@@ -14,9 +15,14 @@ const PREVIEW_PADDING_PX = 24;
 export default function App() {
   const invoice = useInvoiceStore((state) => state.invoice);
   const resetInvoice = useInvoiceStore((state) => state.resetInvoice);
-  const previewRef = useRef<HTMLDivElement>(null);
+  const desktopPreviewRef = useRef<HTMLDivElement>(null);
+  const exportPreviewRef = useRef<HTMLDivElement>(null);
   const previewHostRef = useRef<HTMLElement>(null);
+  const mobilePreviewHostRef = useRef<HTMLDivElement>(null);
+  const mobilePreviewRef = useRef<HTMLDivElement>(null);
   const [previewScale, setPreviewScale] = useState(1);
+  const [mobilePreviewScale, setMobilePreviewScale] = useState(1);
+  const [isMobilePreviewOpen, setIsMobilePreviewOpen] = useState(false);
   const [appearance, setAppearance] = useState<"light" | "dark">("light");
 
   useLayoutEffect(() => {
@@ -26,7 +32,7 @@ export default function App() {
 
   useLayoutEffect(() => {
     const host = previewHostRef.current;
-    const invoiceNode = previewRef.current;
+    const invoiceNode = desktopPreviewRef.current;
     if (!host || !invoiceNode) return;
 
     const updateScale = () => {
@@ -55,8 +61,41 @@ export default function App() {
     };
   }, [invoice]);
 
+  useLayoutEffect(() => {
+    if (!isMobilePreviewOpen) return;
+    const host = mobilePreviewHostRef.current;
+    const invoiceNode = mobilePreviewRef.current;
+    if (!host || !invoiceNode) return;
+
+    const updateScale = () => {
+      const availableWidth = Math.max(1, host.clientWidth - PREVIEW_PADDING_PX);
+      const availableHeight = Math.max(1, host.clientHeight - PREVIEW_PADDING_PX);
+      const contentWidth = Math.max(1, invoiceNode.scrollWidth);
+      const contentHeight = Math.max(1, invoiceNode.scrollHeight);
+
+      const widthScale = availableWidth / contentWidth;
+      const heightScale = availableHeight / contentHeight;
+      const nextScale = Math.min(1, widthScale, heightScale);
+      setMobilePreviewScale(Number.isFinite(nextScale) ? Math.max(0.05, nextScale) : 1);
+      host.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    };
+
+    const hostObserver = new ResizeObserver(updateScale);
+    const invoiceObserver = new ResizeObserver(updateScale);
+    hostObserver.observe(host);
+    invoiceObserver.observe(invoiceNode);
+    updateScale();
+    window.addEventListener("resize", updateScale);
+
+    return () => {
+      hostObserver.disconnect();
+      invoiceObserver.disconnect();
+      window.removeEventListener("resize", updateScale);
+    };
+  }, [isMobilePreviewOpen, invoice]);
+
   const handlePrint = useReactToPrint({
-    contentRef: previewRef,
+    contentRef: exportPreviewRef,
     documentTitle: invoice.meta.invoiceNumber,
     pageStyle: `
       @page { size: A4; margin: 0; }
@@ -65,9 +104,9 @@ export default function App() {
   });
 
   const handleDownload = async () => {
-    if (!previewRef.current) return;
+    if (!exportPreviewRef.current) return;
 
-    const sourceNode = previewRef.current;
+    const sourceNode = exportPreviewRef.current;
 
     const tempRoot = document.createElement("div");
     tempRoot.style.position = "fixed";
@@ -172,6 +211,7 @@ export default function App() {
           onNew={resetInvoice}
           onPrint={() => void handlePrint()}
           onDownload={() => void handleDownload()}
+          onViewPdf={() => setIsMobilePreviewOpen(true)}
           appearance={appearance}
           onToggleTheme={() =>
             setAppearance((mode) => (mode === "dark" ? "light" : "dark"))
@@ -186,17 +226,52 @@ export default function App() {
           </section>
           <section
             ref={previewHostRef}
-            className="animate-fade-in min-h-0 overflow-hidden p-2 lg:p-4"
+            className="animate-fade-in hidden min-h-0 overflow-hidden p-2 lg:block lg:p-4"
           >
             <div className="h-full overflow-hidden rounded-2xl border border-purple-100 bg-white/70 p-1 dark:border-zinc-800 dark:bg-zinc-900/50">
               <div className="h-full overflow-hidden rounded-xl">
-                <InvoicePreview ref={previewRef} invoice={invoice} scale={previewScale} />
+                <InvoicePreview
+                  ref={desktopPreviewRef}
+                  invoice={invoice}
+                  scale={previewScale}
+                />
               </div>
             </div>
           </section>
         </div>
 
-        <PWAInstallPrompt />
+        {isMobilePreviewOpen ? (
+          <section className="no-print fixed inset-0 z-50 flex flex-col bg-zinc-950 lg:hidden">
+            <div className="flex items-center justify-between border-b border-white/20 bg-black px-4 py-3 text-white">
+              <p className="text-sm font-semibold">Invoice Preview</p>
+              <button
+                type="button"
+                className="rounded-md border border-white/30 bg-white/10 p-2"
+                aria-label="Close preview"
+                onClick={() => setIsMobilePreviewOpen(false)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div ref={mobilePreviewHostRef} className="min-h-0 flex-1 overflow-auto p-2">
+              <InvoicePreview
+                ref={mobilePreviewRef}
+                invoice={invoice}
+                scale={mobilePreviewScale}
+                transformOrigin="top left"
+              />
+            </div>
+          </section>
+        ) : null}
+
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed -left-[9999px] top-0 opacity-0"
+        >
+          <InvoicePreview ref={exportPreviewRef} invoice={invoice} scale={1} />
+        </div>
+
+        {!isMobilePreviewOpen ? <PWAInstallPrompt /> : null}
       </main>
     </Theme>
   );
